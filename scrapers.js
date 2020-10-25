@@ -1,27 +1,9 @@
 const puppeteer = require('puppeteer')
 
-const getProductStock = async (page, partialXPath) => {
-  const stocks = []
-
-  for (let i = 2; i <= 7; i++) {
-    const [ el ] = await page.$x(`${ partialXPath }/div[4]/div[${ i }]/div/div[1]/p/a`)
-    const txt = await el.getProperty('textContent')
-    const storeName = await txt.jsonValue()
-
-    const [ el2 ] = await page.$x(`${ partialXPath }/div[4]/div[${ i }]/div/div[2]/div/p/span`)
-    const txt2 = await el2.getProperty('textContent')
-    const stockCount = await txt2.jsonValue()
-
-    stocks.push({ storeName, stockCount })
-  }
-
-  return stocks
-}
-
-const scrapeProducts = async (url) => {
+const scrapeProducts = async (category = 710) => {
   const browser = await puppeteer.launch()
   const page = await browser.newPage()
-  await page.goto(url)
+  await page.goto(`https://www.canadacomputers.com/index.php?cPath=${ category }`)
 
   // Total search results:
   // const [ el ] = await page.$x('//*[@id="search-results"]/div[1]/div[2]')
@@ -29,7 +11,6 @@ const scrapeProducts = async (url) => {
   // const rawResultsLength = await txt.jsonValue()
   // const resultsLength = parseInt(rawResultsLength.trim().split(' ')[ 0 ])
   // console.log(2 * resultsLength)
-
   const items = {}
 
   // Scrape a list of products
@@ -60,12 +41,48 @@ const scrapeProducts = async (url) => {
     const price = await txt3.jsonValue()
 
     // Stocks
-    const stocks = await getProductStock(page, `//*[@id="product-list"]/div[${ i - 1 }]`)
+    const stocks = await getOwnProductStock(page, `//*[@id="product-list"]/div[${ i - 1 }]`)
 
     items[ i ] = { itemCode, title, price, stocks }
   }
 
   // Display each product's info
+  displayOwnStock(items)
+
+  browser.close()
+}
+
+const getQuebecProductStock = async (page, partialXPath) => {
+  const stocks = []
+
+  for (let i = 2; i <= 7; i++) {
+    const [ el ] = await page.$x(`${ partialXPath }/div[4]/div[${ i }]/div/div[1]/p/a`)
+    const txt = await el.getProperty('textContent')
+    const storeName = await txt.jsonValue()
+
+    const [ el2 ] = await page.$x(`${ partialXPath }/div[4]/div[${ i }]/div/div[2]/div/p/span`)
+    const txt2 = await el2.getProperty('textContent')
+    const stockCount = await txt2.jsonValue()
+
+    stocks.push({ storeName, stockCount })
+  }
+
+  return stocks
+}
+
+const getOwnProductStock = async (page, partialXPath) => {
+  const [ el ] = await page.$x(`${ partialXPath }/div[4]/div[2]/div/div[1]/p/a`)
+  const txt = await el.getProperty('textContent')
+  const storeName = await txt.jsonValue()
+
+  const [ el2 ] = await page.$x(`${ partialXPath }/div[4]/div[2]/div/div[2]/div/p/span`)
+  const txt2 = await el2.getProperty('textContent')
+  const stockCount = await txt2.jsonValue()
+
+  return { storeName, stockCount }
+}
+
+const displayQuebecStock = items => {
   Object.entries(items).forEach(([ key, item ]) => {
     console.log(item.itemCode)
     console.log(item.title)
@@ -80,9 +97,16 @@ const scrapeProducts = async (url) => {
     console.log(totalStocks)
     console.log('\n===========================================================================================\n')
   })
-
-  browser.close()
 }
 
-const category = 710
-scrapeProducts(`https://www.canadacomputers.com/index.php?cPath=${ category }`)
+const displayOwnStock = items => {
+  Object.entries(items).forEach(([ key, item ]) => {
+    if (item.stocks.stockCount !== '-') {
+      console.log(item.title)
+      console.log(`${item.itemCode} | ${item.price} | Qty: ${ item.stocks.stockCount }`)
+      console.log('\n===========================================================================================\n')
+    }
+  })
+}
+
+scrapeProducts()
